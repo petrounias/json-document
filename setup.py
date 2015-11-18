@@ -40,6 +40,7 @@ setup(
     description="Powerful and intuitive document bridge for JSON",
     test_suite='unittest2.collector',
     license="LGPLv3",
+    use_2to3 = True,
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

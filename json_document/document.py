@@ -23,9 +23,11 @@ json_document.document
 Document and fragment classes
 """
 
-import copy
+import copy, sys
+from importlib import import_module
+
 from json_schema_validator.errors import SchemaError
-from json_schema_validator.schema  import Schema
+from json_schema_validator.schema import Schema
 from json_schema_validator.validator import Validator
 
 from json_document.errors import OrphanedFragmentError
@@ -89,15 +91,17 @@ class DocumentFragment(object):
     """
 
     __slots__ = ('_document', '_parent', '_value', '_item', '_schema',
-                 '_fragment_cache')
+                 '_fragment_cache', '_validator')
 
-    def __init__(self, document, parent, value, item=None, schema=None):
+    def __init__(self, document, parent, value, item=None, schema=None, 
+                       validator=None):
         self._document = document
         self._parent = parent
         self._value = value
         self._item = item
         self._schema = schema
         self._fragment_cache = {}
+        self._validator = validator
 
     @classmethod
     def _make_fragment(cls, document, parent, value, item=None, schema=None):
@@ -185,10 +189,20 @@ class DocumentFragment(object):
 
     def validate(self):
         """
-        Validate the fragment value against the schema
+        Validate the fragment value against the schema. If the validator is
+        not defined, uses the default validator.
         """
         if self._schema is not None:
-            Validator.validate(self.schema, self.value)
+            if self._validator is None:
+                Validator.validate(self.schema, self.value)
+            else:
+                [mod, func] = self._validator.rsplit('.',1) 
+                try:
+                    val_func = getattr(import_module(mod), func)
+                    val_func(self.schema, self.value)
+                except:
+                    print "Unable to validate: " , sys.exc_info()[0]
+                    raise
 
     def _get_value(self):
         if self.is_default:
@@ -517,7 +531,7 @@ class Document(DocumentFragment):
 
     __slots__ = DocumentFragment.__slots__ + ('_revision',)
 
-    def __init__(self, value, schema=None):
+    def __init__(self, value, schema=None, validator=None):
         """
         Construct a document with the specified value and schema.
 
@@ -532,7 +546,10 @@ class Document(DocumentFragment):
             parent=None,
             value=value,
             item=None,
-            schema=_unwrap(schema or self.__class__.document_schema))
+            schema=_unwrap(schema or self.__class__.document_schema),
+            validator=validator
+        ) 
+        
         # Initially set the revision to 0
         self._revision = 0
 
